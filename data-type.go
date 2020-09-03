@@ -10,8 +10,9 @@ func main() {
 	// var e uint8 = 255
 	var slice1 []string
 	var slice2 [2]int
-	slice3 := []string{}
-	fmt.Println(slice1, slice2, slice3)
+	slice3 := make([]string, 5)
+	fmt.Println("-------------")
+	fmt.Println(slice1, "\n", slice2, "\n", slice3[3])
 
 	x := 10
 	y := x // 复制x的值

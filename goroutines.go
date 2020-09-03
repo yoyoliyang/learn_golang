@@ -34,7 +34,8 @@ func main() {
 	// 初始化一个2个值缓冲的通道
 	msg1 := make(chan string, 2)
 	msg1 <- "hello"
-	msg1 <- "world!"
+	msg1 <- "world"
+	// msg1 <- "!" // 错误！
 	fmt.Println(<-msg1)
 	fmt.Println(<-msg1)
 }

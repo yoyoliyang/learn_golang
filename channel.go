@@ -17,16 +17,17 @@ func worker(done chan bool) {
 }
 
 // 只写通道参数ping
-func ping(ping chan<- string, msg string) {
-	ping <- msg
+func ping(pings chan<- string, msg string) {
+	pings <- msg
 }
 
 // 只读通道参数ping
-func pong(ping <-chan string, pongs chan<- string) {
-	msg := ping
+func pong(pings <-chan string, pongs chan<- string) {
+	msg := <-pings
 	pongs <- msg
 }
 func main() {
+	done := make(chan bool, 1)
 	go worker(done)
 
 	// 等待通道结束
@@ -36,6 +37,6 @@ func main() {
 	pongs := make(chan string, 1)
 
 	ping(pings, "hello")
-	pong(ping, pongs)
+	pong(pings, pongs)
 	fmt.Println(<-pongs)
 }

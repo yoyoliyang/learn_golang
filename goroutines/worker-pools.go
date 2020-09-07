@@ -23,6 +23,7 @@ func main() {
 	results := make(chan int, numJobs)
 
 	for w := 1; w <= 5; w++ {
+		// 创建5个协程
 		go worker(w, jobs, results)
 	}
 

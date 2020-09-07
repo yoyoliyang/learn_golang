@@ -61,4 +61,14 @@ func main() {
 		fmt.Println((*z)[index], item)
 	}
 
+	map1 := make(map[int]string)
+	map1[0] = "青花瓷"
+	// 判断是否存在映射
+	el, ok := map1[1]
+	if ok {
+		fmt.Println(el, ok)
+	} else {
+		fmt.Println(ok)
+	}
+
 }

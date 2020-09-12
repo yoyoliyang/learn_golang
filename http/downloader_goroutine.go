@@ -1,46 +1,16 @@
 package main
 
 import (
-	"bytes"
+	// "bufio"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"os"
 	"sync"
+
+	"github.com/schollz/progressbar/v3"
 )
-
-func createZeroFile(size int64, file *os.File) {
-
-	//创建空文件（方便下面文件指针偏移）
-	fmt.Println("正在创建空文件 size: ", size)
-	var zeroSize int64 = 0
-	zeroBytes := make([]byte, 1024)
-	if size <= 1024 {
-		zeroBytes := make([]byte, size)
-		zeroReader := bytes.NewReader(zeroBytes)
-		n, err := io.Copy(file, zeroReader)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println("ok. zero file size ：", n)
-		return
-	}
-	for {
-		zeroReader := bytes.NewReader(zeroBytes)
-		n, err := io.Copy(file, zeroReader)
-		if err != nil {
-			panic(err)
-		}
-		zeroSize += n
-		// fmt.Printf("写入了: %v/%v\n", zeroSize, size)
-
-		if zeroSize == size {
-			fmt.Println("ok. zero file size ：", n)
-			break
-		}
-	}
-}
 
 func block(length int64) (int64, int64) {
 	// 划分文件为10份
@@ -63,7 +33,7 @@ func block(length int64) (int64, int64) {
 	// fmt.Println(block*9 + block - inc)
 }
 
-func downloader(file *os.File, w int, block int64, lastBlock int64, url string, done chan<- bool, m *sync.Mutex) {
+func downloader(file *os.File, w int, block int64, lastBlock int64, url string, done chan<- bool, m *sync.Mutex, bar *progressbar.ProgressBar) {
 	fmt.Println("starting worker: ", w)
 
 	// 启动http请求
@@ -93,19 +63,29 @@ func downloader(file *os.File, w int, block int64, lastBlock int64, url string, 
 		}
 		defer resp.Body.Close()
 
-		m.Lock()
 		// 数据写入偏移位置
-		if w == 1 {
-			file.Seek(block*(int64(w)-1), 0)
-		} else {
-			file.Seek(block*(int64(w)-1)+1, 0)
+		offset := block * (int64(w) - 1)
+		if w != 1 {
+			offset = offset + 1
 		}
-		n, err := io.Copy(file, resp.Body)
-		if err != nil {
-			panic(err)
+		//此处有问题尚未解决，seek后，由于其他协程的操作，可能指针立刻变成了其他位置，下方的copy便会错位,必须要保证指针在copy之前不可变
+		buf := make([]byte, 1024)
+
+		for {
+			nr, err := resp.Body.Read(buf)
+			if nr > 0 {
+				file.WriteAt(buf[0:nr], offset)
+				offset += int64(nr)
+			}
+			if err != nil {
+				break
+			}
+			if err == io.EOF {
+				break
+			}
 		}
-		m.Unlock()
-		fmt.Println("worker: ", w, " end ", "writed ", n)
+
+		fmt.Println("worker: ", w, "end")
 		done <- true
 	}
 }
@@ -150,8 +130,13 @@ func main() {
 	defer f.Close()
 
 	// 写入空值到下载文件中
-	createZeroFile(length, f)
+	// createZeroFile(length, f)
 	b, lb := block(length)
+
+	bar := progressbar.DefaultBytes(
+		length,
+		"downloading",
+	)
 
 	// 初始化互斥锁
 	mutex := &sync.Mutex{}
@@ -159,7 +144,7 @@ func main() {
 	done := make(chan bool, 10)
 	// 下发任务
 	for w := 1; w <= 10; w++ {
-		go downloader(f, w, b, lb, url, done, mutex)
+		go downloader(f, w, b, lb, url, done, mutex, bar)
 	}
 
 	// 阻塞任务
@@ -167,5 +152,6 @@ func main() {
 		<-done
 	}
 	close(done)
+	fmt.Println("end")
 
 }
